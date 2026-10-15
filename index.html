@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="nl" translate="no">
 <head>
 <meta charset="UTF-8">
+<meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0f172a">
 <title>Reactietijdstudie</title>
@@ -250,7 +251,7 @@
    CONFIGURATION – change these values to adapt the study
    ===================================================================== */
 const CONFIG = {
-  FORMSPREE_ENDPOINT: 'https://formspree.io/f/xnpjzreo', // <- paste your Formspree form URL
+  FORMSPREE_ENDPOINT: 'https://formspree.io/f/YOUR_FORM_ID', // <- paste your Formspree form URL
   APP_VERSION: '2.0-LR-NL', // LR = Left-or-Right only, NL = Dutch text and Dutch read-aloud
 
   // Session structure: ONE test per session, chosen at random
@@ -427,16 +428,23 @@ function toChunks(text, gap) {
   return (text.match(/[^.!?]+[.!?]*\s*/g) || []).map(t => t.trim()).filter(Boolean)
     .map(t => ({ t, gap: gap === undefined ? CONFIG.SPEECH_GAP_MS : gap }));
 }
-// One question + all its answer options, built from the page itself so it always matches what is on screen.
-function fieldsetChunks(fs) {
-  const clean = t => t.replace(/[()]/g, '').replace(/\s*\/\s*/g, ' of ').replace(/\s+/g, ' ').trim();
-  const out = toChunks(clean(fs.querySelector('legend').textContent), 600);
-  if (fs.querySelector('#tiredScale')) {
+// One question + all its answer options. The Dutch words are written out here (not read from the screen),
+// so the reader stays Dutch even if a browser translates the page. If you change a question or answer on screen, change it here too.
+const SPEECH_Q = [
+  { q: 'Welk apparaat gebruikt u voor de test?', multi: false, a: ['Telefoon', 'Laptop', 'Tablet'] },
+  { q: 'Welk deel van de dag is het?', multi: false, a: ['Ochtend', 'Rond de middag', 'Namiddag', 'Avond'] },
+  { q: 'Wat heeft u het afgelopen uur gedaan? Kies alle gedane activiteiten.', multi: true,
+    a: ['Huishoudelijke activiteiten', 'Werk of studie', 'Fysieke oefeningen', 'Sociale activiteiten',
+        'Ontspannen of rusten', 'Verplaatsen of reizen', 'Overige activiteiten'] },
+  { q: 'Welk cijfer zou u uw energieniveau momenteel geven?', scale: true }
+];
+function fieldsetChunks(n) {
+  const f = SPEECH_Q[n], out = toChunks(f.q, 600);
+  if (f.scale) {
     out.push(...toChunks('U kunt een cijfer kiezen van één tot en met tien. Één betekent: extreem moe. Tien betekent: totaal niet vermoeid.', 600));
   } else {
-    const multi = !!fs.querySelector('input[type=checkbox]');
-    out.push({ t: multi ? 'U kunt meerdere antwoorden kiezen. De antwoorden zijn:' : 'De antwoorden zijn:', gap: 700 });
-    fs.querySelectorAll('.chip span').forEach(sp => out.push({ t: clean(sp.textContent) + '.', gap: 800 }));
+    out.push({ t: f.multi ? 'U kunt meerdere antwoorden kiezen. De antwoorden zijn:' : 'De antwoorden zijn:', gap: 700 });
+    f.a.forEach(x => out.push({ t: x + '.', gap: 800 }));
   }
   out[out.length - 1].gap = 1200;
   return out;
@@ -450,14 +458,14 @@ function questionChunks() {
     'Daarna volgen vier vragen. Bij elke vraag lees ik ook de antwoorden voor.';
   const out = toChunks(intro, 600);
   out[out.length - 1].gap = 1200;
-  document.querySelectorAll('#qSection fieldset').forEach(fs => out.push(...fieldsetChunks(fs)));
+  SPEECH_Q.forEach((_, n) => out.push(...fieldsetChunks(n)));
   out.push(...toChunks('Als u klaar bent, kies Ga verder. Wilt u de vragen overslaan, kies Sla deze vragen over.'));
   return out;
 }
 function listenChunks(kind) {
   if (kind === 'questions') return questionChunks();
   const m = /^q(\d)$/.exec(kind);
-  if (m) return fieldsetChunks(document.querySelectorAll('#qSection fieldset')[+m[1]]);
+  if (m) return fieldsetChunks(+m[1]);
   return toChunks(speechText(kind));
 }
 
